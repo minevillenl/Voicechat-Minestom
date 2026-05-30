@@ -16,12 +16,12 @@
 
 ```kts
 repositories {
-    mavenCentral() // minestom
-    maven("https://repo.hypera.dev/snapshots/") // simple-voice-chat-minestom
+    mavenCentral()
+    maven("https://jitpack.io") 
 }
 
-dependencies {
-    implementation("dev.lu15:simple-voice-chat-minestom:0.1.0-SNAPSHOT")
+dependencies { 
+    implementation("com.github.thebigtijn:voicechat-minestom:main-SNAPSHOT")
 }
 ```
 

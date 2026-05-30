@@ -62,6 +62,9 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Local-only runnable test server (gitignored). See testserver.gradle.kts.
+if (file("testserver.gradle.kts").exists()) apply(from = "testserver.gradle.kts")
+
 // -----------------------------------------------------------------------
 // Publishing (Hypera snapshots repo, matching the original setup)
 // -----------------------------------------------------------------------

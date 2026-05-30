@@ -3,6 +3,7 @@ package dev.lu15.voicechat.network.voice;
 import dev.lu15.voicechat.SoundSources;
 import dev.lu15.voicechat.Tags;
 import dev.lu15.voicechat.VoiceChat;
+import dev.lu15.voicechat.network.minecraft.Group;
 import dev.lu15.voicechat.network.minecraft.VoiceState;
 import dev.lu15.voicechat.event.PlayerJoinVoiceChatEvent;
 import dev.lu15.voicechat.event.PlayerMicrophoneEvent;
@@ -10,6 +11,7 @@ import dev.lu15.voicechat.network.minecraft.packets.clientbound.VoiceStatesUpdat
 import dev.lu15.voicechat.network.voice.encryption.SecretUtilities;
 import dev.lu15.voicechat.network.voice.packets.AuthenticatePacket;
 import dev.lu15.voicechat.network.voice.packets.AuthenticationAcknowledgedPacket;
+import dev.lu15.voicechat.network.voice.packets.GroupSoundPacket;
 import dev.lu15.voicechat.network.voice.packets.KeepAlivePacket;
 import dev.lu15.voicechat.network.voice.packets.MicrophonePacket;
 import dev.lu15.voicechat.network.voice.packets.PingPacket;
@@ -232,25 +234,67 @@ public final class VoiceServer {
     }
 
     private void handle(@NotNull Player player, @NotNull MicrophonePacket packet) {
-        // todo: implement groups?
-
         PlayerMicrophoneEvent event = new PlayerMicrophoneEvent(player, packet.data());
         EventDispatcher.callCancellable(event, () -> {
-            PlayerSoundPacket soundPacket = new PlayerSoundPacket(
-                    player.getUuid(), // the channel is the sender's UUID
+            Group group = player.getTag(Tags.GROUP);
+            if (group == null) {
+                // not in a group: normal proximity audio
+                this.broadcastProximity(player, event, packet, null);
+                return;
+            }
+
+            // send group audio to every other member of the same group, ignoring distance
+            GroupSoundPacket groupSound = new GroupSoundPacket(
+                    player.getUuid(), // channel is the sender's UUID
                     player.getUuid(),
                     event.getAudio(),
                     packet.sequenceNumber(),
-                    event.getSoundSelector().distance(),
-                    packet.whispering(),
-                    SoundSources.PROXIMITY
+                    null
             );
+            for (Player listener : this.connections.values()) {
+                if (listener.equals(player)) continue;
+                Group listenerGroup = listener.getTag(Tags.GROUP);
+                if (listenerGroup == null || !listenerGroup.id().equals(group.id())) continue;
+                if (isDisabled(listener)) continue;
+                this.write(listener, groupSound);
+            }
 
-            event.getSoundSelector().canHear(player).stream().filter(p -> {
-                if (p.equals(player)) return false;
-                return !p.hasTag(Tags.PLAYER_STATE) || !p.getTag(Tags.PLAYER_STATE).disabled();
-            }).forEach(p -> this.write(p, soundPacket));
+            // open groups also emit proximity audio to nearby non-group players
+            if (group.type() == Group.Type.OPEN) {
+                this.broadcastProximity(player, event, packet, group.id());
+            }
         });
+    }
+
+    // sends proximity audio, skipping players already covered by group audio and isolated listeners
+    private void broadcastProximity(@NotNull Player player, @NotNull PlayerMicrophoneEvent event,
+                                    @NotNull MicrophonePacket packet, @Nullable java.util.UUID senderGroupId) {
+        PlayerSoundPacket soundPacket = new PlayerSoundPacket(
+                player.getUuid(), // the channel is the sender's UUID
+                player.getUuid(),
+                event.getAudio(),
+                packet.sequenceNumber(),
+                event.getSoundSelector().distance(),
+                packet.whispering(),
+                SoundSources.PROXIMITY
+        );
+
+        event.getSoundSelector().canHear(player).stream().filter(p -> {
+            if (p.equals(player)) return false;
+            if (p.hasTag(Tags.PLAYER_STATE) && p.getTag(Tags.PLAYER_STATE).disabled()) return false;
+            Group listenerGroup = p.getTag(Tags.GROUP);
+            if (listenerGroup != null) {
+                // already received this audio via group sound
+                if (senderGroupId != null && listenerGroup.id().equals(senderGroupId)) return false;
+                // isolated groups never hear proximity audio
+                if (listenerGroup.type() == Group.Type.ISOLATED) return false;
+            }
+            return true;
+        }).forEach(p -> this.write(p, soundPacket));
+    }
+
+    private static boolean isDisabled(@NotNull Player player) {
+        return player.hasTag(Tags.PLAYER_STATE) && player.getTag(Tags.PLAYER_STATE).disabled();
     }
 
     private void handle(@NotNull Player player, @NotNull KeepAlivePacket ignored) {

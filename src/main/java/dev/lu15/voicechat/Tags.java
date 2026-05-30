@@ -1,5 +1,6 @@
 package dev.lu15.voicechat;
 
+import dev.lu15.voicechat.network.minecraft.Group;
 import dev.lu15.voicechat.network.minecraft.VoiceState;
 import java.net.SocketAddress;
 import java.util.UUID;
@@ -12,6 +13,7 @@ public final class Tags {
     public static final @NotNull Tag<VoiceState> PLAYER_STATE = Tag.Transient("voicechat:player-state");
     public static final @NotNull Tag<Long> LAST_KEEP_ALIVE = Tag.Long("voicechat:last-keep-alive");
     public static final @NotNull Tag<UUID> SECRET = Tag.Transient("voicechat:secret"); // transient because we don't ever want to save this to disk
+    public static final @NotNull Tag<Group> GROUP = Tag.Transient("voicechat:group"); // voice group the player is in, absent if none
 
     private Tags() {}
 

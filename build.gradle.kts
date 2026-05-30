@@ -1,63 +1,97 @@
 plugins {
-    `java-library`
-    signing
-    id("net.kyori.indra")
-    id("net.kyori.indra.publishing")
-    id("net.ltgt.errorprone") version "4.3.0"
+    java
+    `maven-publish`
 }
 
 group = "dev.lu15"
 version = "0.2.0-SNAPSHOT"
 
-indra {
-    mitLicense()
-    github("LooFifteen", "simple-voice-chat-minestom") {
-        ci(true)
+var minestomCommit = "2026.05.11-1.21.11"
+
+// -----------------------------------------------------------------------
+// Repositories
+// -----------------------------------------------------------------------
+
+repositories {
+    mavenCentral()
+
+    maven("https://repo.hypera.dev/snapshots/")
+    maven("https://jitpack.io")
+
+}
+
+// -----------------------------------------------------------------------
+// Dependencies
+// -----------------------------------------------------------------------
+
+dependencies {
+    // --- Minestom ---
+    // Pin to the latest Minestom 1.21.x release; update as new builds land.
+    // Check https://github.com/Minestom/Minestom/releases for the newest.
+    compileOnly("com.github.Minestom:Minestom:$minestomCommit")
+
+    // --- Opus codec (concentus – pure-Java, no native lib required) ---
+    // Used by the CLIENT-SIDE mod; the server only re-routes raw bytes,
+    // so this is included here only if you want server-side decoding.
+    // Remove if you don't need it.
+    implementation("io.github.jaredmdobson:concentus:1.0.2")
+
+    // --- Testing ---
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// -----------------------------------------------------------------------
+// Java toolchain
+// -----------------------------------------------------------------------
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
     }
+    withSourcesJar()
+    withJavadocJar()
+}
 
-    signWithKeyFromPrefixedProperties("ci")
-    publishSnapshotsTo("hyperaSnapshots", "https://repo.hypera.dev/snapshots/")
+// -----------------------------------------------------------------------
+// Tests
+// -----------------------------------------------------------------------
 
-    javaVersions {
-        target(21)
-        testWith(21)
-    }
+tasks.test {
+    useJUnitPlatform()
+}
 
-    configurePublications {
-        pom {
-            inceptionYear = "2024"
+// -----------------------------------------------------------------------
+// Publishing (Hypera snapshots repo, matching the original setup)
+// -----------------------------------------------------------------------
 
-            developers {
-                developer {
-                    id = "LooFifteen"
-                    name = "Luis"
-                    email = "luis@lu15.dev"
-                    timezone = "Europe/London"
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            pom {
+                name = "simple-voice-chat-minestom"
+                description = "Minestom port of Simple Voice Chat"
+                url = "https://github.com/LooFifteen/simple-voice-chat-minestom"
+                licenses {
+                    license {
+                        name = "MIT License"
+                        url = "https://opensource.org/licenses/MIT"
+                    }
                 }
             }
         }
     }
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    // minestom
-    val minestom = "net.minestom:minestom:2025.08.29-1.21.8"
-    compileOnly(minestom)
-    testImplementation(minestom)
-
-    // error-prone
-    errorprone("com.google.errorprone:error_prone_core:2.41.0")
-
-    // testing
-    testImplementation(platform("org.junit:junit-bom:5.13.4"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("ch.qos.logback:logback-classic:1.5.18")
-}
-
-tasks.test {
-    useJUnitPlatform()
+    repositories {
+        maven {
+            val releasesUrl = "https://repo.hypera.dev/releases/"
+            val snapshotsUrl = "https://repo.hypera.dev/snapshots/"
+            url = uri(if (version.toString().endsWith("-SNAPSHOT")) snapshotsUrl else releasesUrl)
+            credentials {
+                username = System.getenv("HYPERA_USERNAME")
+                password = System.getenv("HYPERA_TOKEN")
+            }
+        }
+    }
 }

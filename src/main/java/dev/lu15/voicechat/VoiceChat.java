@@ -110,6 +110,15 @@ public sealed interface VoiceChat permits VoiceChatImpl {
         @NotNull Builder allowRecording(boolean allowRecording);
 
         /**
+         * Set the maximum number of Minecraft-channel voice chat packets (group and
+         * state changes) a player may send per second before being kicked. This does
+         * not affect UDP voice traffic. Set to {@code -1} to disable. Defaults to {@code 16}.
+         * @param packetRateLimit the per-second packet limit
+         * @return this builder
+         */
+        @NotNull Builder packetRateLimit(int packetRateLimit);
+
+        /**
          * Enable the voice chat server.
          * @return the voice chat server
          */

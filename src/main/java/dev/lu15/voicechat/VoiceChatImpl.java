@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.minestom.server.MinecraftServer;
@@ -55,6 +56,9 @@ final class VoiceChatImpl implements VoiceChat {
 
     private static final @NotNull Logger LOGGER = LoggerFactory.getLogger(VoiceChatImpl.class);
 
+    // group names: no leading control/whitespace char, no control characters, 1-24 chars (matches upstream)
+    private static final @NotNull Pattern GROUP_NAME_PATTERN = Pattern.compile("^[^\\p{C}\\s][^\\p{C}]{0,23}$");
+
     private final @NotNull MinecraftPacketHandler packetHandler = new MinecraftPacketHandler();
     private final @NotNull DynamicRegistry<Category> categories = DynamicRegistry.create(VoiceChat.key("categories"));
 
@@ -63,6 +67,7 @@ final class VoiceChatImpl implements VoiceChat {
     private final @NotNull Map<UUID, String> groupPasswords = new ConcurrentHashMap<>();
 
     private final @NotNull VoiceServer server;
+    private final @NotNull PacketRateLimiter rateLimiter;
     private final int port;
     private final @NotNull String publicAddress;
     private final @NotNull PermissionHandler permissions;
@@ -84,6 +89,7 @@ final class VoiceChatImpl implements VoiceChat {
         this.keepAlive = builder.keepAlive;
         this.groupsEnabled = builder.groupsEnabled;
         this.allowRecording = builder.allowRecording;
+        this.rateLimiter = new PacketRateLimiter(builder.packetRateLimit);
 
         // minestom doesn't allow removal of items from registries by default, so
         // we have to enable this feature to allow for the removal of categories
@@ -103,9 +109,15 @@ final class VoiceChatImpl implements VoiceChat {
 
             if (!identifier.namespace().equals("voicechat")) return;
 
+            final Player player = event.getPlayer();
+            if (!this.rateLimiter.allow(player.getUuid())) {
+                LOGGER.warn("player {} exceeded the voice chat packet rate limit", player.getUsername());
+                player.kick(Component.text("Simple Voice Chat | Exceeded packet rate limit."));
+                return;
+            }
+
             try {
                 Packet<?> packet = this.packetHandler.read(channel, event.getMessage());
-                final Player player = event.getPlayer();
                 switch (packet) {
                     case HandshakePacket p -> this.handle(player, p);
                     case UpdateStatePacket p -> this.handle(player, p);
@@ -139,6 +151,7 @@ final class VoiceChatImpl implements VoiceChat {
         // when a player leaves, drop any non-persistent group that is now empty
         eventNode.addListener(PlayerDisconnectEvent.class, event -> {
             Player player = event.getPlayer();
+            this.rateLimiter.remove(player.getUuid());
             if (player.hasTag(Tags.GROUP)) {
                 player.removeTag(Tags.GROUP);
                 this.cleanupGroups();
@@ -184,8 +197,13 @@ final class VoiceChatImpl implements VoiceChat {
     }
 
     private void handle(@NotNull Player player, @NotNull CreateGroupPacket packet) {
+        if (!this.groupsEnabled) return;
         if (!this.permissions.hasPermission(player, Permission.CREATE_GROUP)) {
             this.denyPermission(player);
+            return;
+        }
+        if (!isValidGroupName(packet.name()) || !isValidGroupPassword(packet.password())) {
+            LOGGER.warn("player {} tried to create a group with an invalid name or password", player.getUsername());
             return;
         }
 
@@ -205,9 +223,11 @@ final class VoiceChatImpl implements VoiceChat {
         // the creator immediately joins their new group
         this.broadcastState(player, this.isDisabled(player), group);
         this.sendPacket(player, new GroupChangedPacket(group.id(), false));
+        this.cleanupGroups(); // reap the group the creator just left, if now empty
     }
 
     private void handle(@NotNull Player player, @NotNull JoinGroupPacket packet) {
+        if (!this.groupsEnabled) return;
         if (!this.permissions.hasPermission(player, Permission.JOIN_GROUP)) {
             this.denyPermission(player);
             return;
@@ -227,6 +247,7 @@ final class VoiceChatImpl implements VoiceChat {
 
         this.broadcastState(player, this.isDisabled(player), group);
         this.sendPacket(player, new GroupChangedPacket(group.id(), false));
+        this.cleanupGroups(); // reap the group the player just left, if now empty
     }
 
     private void handle(@NotNull Player player, @NotNull LeaveGroupPacket packet) {
@@ -238,6 +259,15 @@ final class VoiceChatImpl implements VoiceChat {
     private boolean isDisabled(@NotNull Player player) {
         VoiceState state = player.getTag(Tags.PLAYER_STATE);
         return state != null && state.disabled();
+    }
+
+    // matches upstream: no leading control/whitespace, no control characters, 1-24 chars
+    private static boolean isValidGroupName(@Nullable String name) {
+        return name != null && GROUP_NAME_PATTERN.matcher(name).matches();
+    }
+
+    private static boolean isValidGroupPassword(@Nullable String password) {
+        return password == null || GROUP_NAME_PATTERN.matcher(password).matches();
     }
 
     private void denyPermission(@NotNull Player player) {
@@ -345,6 +375,7 @@ final class VoiceChatImpl implements VoiceChat {
         private int keepAlive = 1000;
         private boolean groupsEnabled = true;
         private boolean allowRecording = false;
+        private int packetRateLimit = 16;
 
         private @Nullable EventNode<Event> eventNode;
 
@@ -408,6 +439,12 @@ final class VoiceChatImpl implements VoiceChat {
         @Override
         public @NotNull Builder allowRecording(boolean allowRecording) {
             this.allowRecording = allowRecording;
+            return this;
+        }
+
+        @Override
+        public @NotNull Builder packetRateLimit(int packetRateLimit) {
+            this.packetRateLimit = packetRateLimit;
             return this;
         }
 

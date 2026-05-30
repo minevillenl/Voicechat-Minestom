@@ -25,10 +25,10 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -51,7 +51,7 @@ public final class VoiceServer {
     private final @NotNull VoiceSocket socket = new VoiceSocket();
     private final @NotNull VoicePacketHandler packetHandler = new VoicePacketHandler();
     private final @NotNull BlockingQueue<RawPacket> packetQueue = new LinkedBlockingQueue<>();
-    private final @NotNull Map<SocketAddress, Player> connections = new HashMap<>();
+    private final @NotNull Map<SocketAddress, Player> connections = new ConcurrentHashMap<>();
 
     private final @NotNull VoiceChat voiceChat;
     private final @NotNull InetAddress address;

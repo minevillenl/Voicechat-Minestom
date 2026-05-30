@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.Component;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.entity.Player;
 import net.minestom.server.event.Event;
@@ -64,11 +65,13 @@ final class VoiceChatImpl implements VoiceChat {
     private final @NotNull VoiceServer server;
     private final int port;
     private final @NotNull String publicAddress;
+    private final @NotNull PermissionHandler permissions;
 
     @SuppressWarnings("PatternValidation")
-    private VoiceChatImpl(@NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode, @NotNull String publicAddress) {
+    private VoiceChatImpl(@NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode, @NotNull String publicAddress, @NotNull PermissionHandler permissions) {
         this.port = port;
         this.publicAddress = publicAddress;
+        this.permissions = permissions;
 
         // minestom doesn't allow removal of items from registries by default, so
         // we have to enable this feature to allow for the removal of categories
@@ -76,7 +79,7 @@ final class VoiceChatImpl implements VoiceChat {
 
         EventNode<Event> voiceServerEventNode = EventNode.all("voice-server");
         eventNode.addChild(voiceServerEventNode);
-        this.server = new VoiceServer(this, address, port, voiceServerEventNode);
+        this.server = new VoiceServer(this, address, port, voiceServerEventNode, permissions);
 
         this.server.start();
         LOGGER.info("voice server started on {}:{}", address, port);
@@ -169,6 +172,11 @@ final class VoiceChatImpl implements VoiceChat {
     }
 
     private void handle(@NotNull Player player, @NotNull CreateGroupPacket packet) {
+        if (!this.permissions.hasPermission(player, Permission.CREATE_GROUP)) {
+            this.denyPermission(player);
+            return;
+        }
+
         Group group = new Group(
                 UUID.randomUUID(),
                 packet.name(),
@@ -188,6 +196,11 @@ final class VoiceChatImpl implements VoiceChat {
     }
 
     private void handle(@NotNull Player player, @NotNull JoinGroupPacket packet) {
+        if (!this.permissions.hasPermission(player, Permission.JOIN_GROUP)) {
+            this.denyPermission(player);
+            return;
+        }
+
         Group group = this.groups.get(packet.group());
         if (group == null) {
             this.sendPacket(player, new GroupChangedPacket(null, false));
@@ -213,6 +226,10 @@ final class VoiceChatImpl implements VoiceChat {
     private boolean isDisabled(@NotNull Player player) {
         VoiceState state = player.getTag(Tags.PLAYER_STATE);
         return state != null && state.disabled();
+    }
+
+    private void denyPermission(@NotNull Player player) {
+        player.sendActionBar(Component.text("You don't have permission to do that."));
     }
 
     // updates the player's group tag and broadcasts their new voice state to everyone
@@ -309,6 +326,7 @@ final class VoiceChatImpl implements VoiceChat {
         private final int port;
 
         private @NotNull String publicAddress = ""; // this causes the client to attempt to connect to the same ip as the minecraft server
+        private @NotNull PermissionHandler permissions = PermissionHandler.ALLOW_ALL;
 
         private @Nullable EventNode<Event> eventNode;
 
@@ -334,6 +352,12 @@ final class VoiceChatImpl implements VoiceChat {
         }
 
         @Override
+        public @NotNull Builder permissions(@NotNull PermissionHandler permissions) {
+            this.permissions = permissions;
+            return this;
+        }
+
+        @Override
         public @NotNull VoiceChat enable() {
             // if the user did not provide an event node, create and register one
             if (this.eventNode == null) {
@@ -341,7 +365,7 @@ final class VoiceChatImpl implements VoiceChat {
                 MinecraftServer.getGlobalEventHandler().addChild(this.eventNode);
             }
 
-            return new VoiceChatImpl(this.address, this.port, this.eventNode, this.publicAddress);
+            return new VoiceChatImpl(this.address, this.port, this.eventNode, this.publicAddress, this.permissions);
         }
 
     }

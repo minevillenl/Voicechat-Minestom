@@ -59,6 +59,14 @@ public sealed interface VoiceChat permits VoiceChatImpl {
         @NotNull Builder publicAddress(@NotNull String publicAddress);
 
         /**
+         * Set the permission handler used to gate voice chat actions such as
+         * creating or joining groups. Defaults to {@link PermissionHandler#ALLOW_ALL}.
+         * @param permissions the permission handler
+         * @return this builder
+         */
+        @NotNull Builder permissions(@NotNull PermissionHandler permissions);
+
+        /**
          * Enable the voice chat server.
          * @return the voice chat server
          */

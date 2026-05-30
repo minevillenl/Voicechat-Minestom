@@ -1,5 +1,7 @@
 package dev.lu15.voicechat.network.voice;
 
+import dev.lu15.voicechat.Permission;
+import dev.lu15.voicechat.PermissionHandler;
 import dev.lu15.voicechat.SoundSources;
 import dev.lu15.voicechat.Tags;
 import dev.lu15.voicechat.VoiceChat;
@@ -53,14 +55,16 @@ public final class VoiceServer {
     private final @NotNull VoiceChat voiceChat;
     private final @NotNull InetAddress address;
     private final int port;
+    private final @NotNull PermissionHandler permissions;
 
     private boolean running;
     private long lastKeepAlive;
 
-    public VoiceServer(@NotNull VoiceChat voiceChat, @NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode) {
+    public VoiceServer(@NotNull VoiceChat voiceChat, @NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode, @NotNull PermissionHandler permissions) {
         this.voiceChat = voiceChat;
         this.address = address;
         this.port = port;
+        this.permissions = permissions;
 
         eventNode.addListener(PlayerDisconnectEvent.class, event -> {
             Player player = event.getPlayer();
@@ -234,6 +238,9 @@ public final class VoiceServer {
     }
 
     private void handle(@NotNull Player player, @NotNull MicrophonePacket packet) {
+        // players without the speak permission are silently muted
+        if (!this.permissions.hasPermission(player, Permission.SPEAK)) return;
+
         PlayerMicrophoneEvent event = new PlayerMicrophoneEvent(player, packet.data());
         EventDispatcher.callCancellable(event, () -> {
             Group group = player.getTag(Tags.GROUP);
@@ -256,6 +263,7 @@ public final class VoiceServer {
                 Group listenerGroup = listener.getTag(Tags.GROUP);
                 if (listenerGroup == null || !listenerGroup.id().equals(group.id())) continue;
                 if (isDisabled(listener)) continue;
+                if (!this.permissions.hasPermission(listener, Permission.LISTEN)) continue;
                 this.write(listener, groupSound);
             }
 
@@ -282,6 +290,7 @@ public final class VoiceServer {
         event.getSoundSelector().canHear(player).stream().filter(p -> {
             if (p.equals(player)) return false;
             if (p.hasTag(Tags.PLAYER_STATE) && p.getTag(Tags.PLAYER_STATE).disabled()) return false;
+            if (!this.permissions.hasPermission(p, Permission.LISTEN)) return false;
             Group listenerGroup = p.getTag(Tags.GROUP);
             if (listenerGroup != null) {
                 // already received this audio via group sound

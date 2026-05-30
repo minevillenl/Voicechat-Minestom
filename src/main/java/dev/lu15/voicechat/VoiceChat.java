@@ -67,6 +67,49 @@ public sealed interface VoiceChat permits VoiceChatImpl {
         @NotNull Builder permissions(@NotNull PermissionHandler permissions);
 
         /**
+         * Set the audio codec advertised to clients. Defaults to {@link Codec#VOIP}.
+         * @param codec the codec
+         * @return this builder
+         */
+        @NotNull Builder codec(@NotNull Codec codec);
+
+        /**
+         * Set the maximum voice packet size (MTU) in bytes. Defaults to {@code 1024}.
+         * @param mtuSize the mtu size
+         * @return this builder
+         */
+        @NotNull Builder mtuSize(int mtuSize);
+
+        /**
+         * Set the default proximity voice distance in blocks. Defaults to {@code 48}.
+         * @param distance the distance
+         * @return this builder
+         */
+        @NotNull Builder distance(double distance);
+
+        /**
+         * Set the keep-alive interval in milliseconds. Connections are dropped after
+         * ten missed intervals. Defaults to {@code 1000}.
+         * @param keepAlive the keep-alive interval
+         * @return this builder
+         */
+        @NotNull Builder keepAlive(int keepAlive);
+
+        /**
+         * Set whether groups are enabled. Defaults to {@code true}.
+         * @param groupsEnabled whether groups are enabled
+         * @return this builder
+         */
+        @NotNull Builder groupsEnabled(boolean groupsEnabled);
+
+        /**
+         * Set whether clients are allowed to record audio. Defaults to {@code false}.
+         * @param allowRecording whether recording is allowed
+         * @return this builder
+         */
+        @NotNull Builder allowRecording(boolean allowRecording);
+
+        /**
          * Enable the voice chat server.
          * @return the voice chat server
          */

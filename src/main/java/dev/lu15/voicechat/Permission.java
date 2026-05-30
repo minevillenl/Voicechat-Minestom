@@ -19,10 +19,10 @@ public enum Permission {
     SPEAK("voicechat.speak", PermissionType.EVERYONE),
 
     /** Required to create a new voice group. {@code voicechat.groups} */
-    CREATE_GROUP("voicechat.groups", PermissionType.EVERYONE),
+    CREATE_GROUP("voicechat.groups.create", PermissionType.EVERYONE),
 
     /** Required to join an existing voice group. {@code voicechat.groups} */
-    JOIN_GROUP("voicechat.groups", PermissionType.EVERYONE),
+    JOIN_GROUP("voicechat.groups.join", PermissionType.EVERYONE),
 
     /** Required for administrative voice chat actions. {@code voicechat.admin} */
     ADMIN("voicechat.admin", PermissionType.OPS);

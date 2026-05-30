@@ -3,6 +3,7 @@ package dev.lu15.voicechat.network.voice;
 import dev.lu15.voicechat.Permission;
 import dev.lu15.voicechat.PermissionHandler;
 import dev.lu15.voicechat.SoundSources;
+import dev.lu15.voicechat.api.SoundSelector;
 import dev.lu15.voicechat.Tags;
 import dev.lu15.voicechat.VoiceChat;
 import dev.lu15.voicechat.network.minecraft.Group;
@@ -56,15 +57,19 @@ public final class VoiceServer {
     private final @NotNull InetAddress address;
     private final int port;
     private final @NotNull PermissionHandler permissions;
+    private final double distance;
+    private final int keepAlive;
 
     private boolean running;
     private long lastKeepAlive;
 
-    public VoiceServer(@NotNull VoiceChat voiceChat, @NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode, @NotNull PermissionHandler permissions) {
+    public VoiceServer(@NotNull VoiceChat voiceChat, @NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode, @NotNull PermissionHandler permissions, double distance, int keepAlive) {
         this.voiceChat = voiceChat;
         this.address = address;
         this.port = port;
         this.permissions = permissions;
+        this.distance = distance;
+        this.keepAlive = keepAlive;
 
         eventNode.addListener(PlayerDisconnectEvent.class, event -> {
             Player player = event.getPlayer();
@@ -114,8 +119,7 @@ public final class VoiceServer {
         while (this.running) {
             try {
                 long keepAliveTime = System.currentTimeMillis();
-                if (keepAliveTime - this.lastKeepAlive > 1000) {
-                    // todo: make this configurable
+                if (keepAliveTime - this.lastKeepAlive > this.keepAlive) {
                     this.checkKeepAlives();
                     this.lastKeepAlive = keepAliveTime;
                 }
@@ -192,7 +196,7 @@ public final class VoiceServer {
         long time = System.currentTimeMillis();
 
         Map.copyOf(this.connections).forEach((address, player) -> {
-            if (time - player.getTag(Tags.LAST_KEEP_ALIVE) > 1000 * 10) { // todo: make this configurable
+            if (time - player.getTag(Tags.LAST_KEEP_ALIVE) > this.keepAlive * 10L) {
                 // todo: will the client be trying to reconnect?
                 LOGGER.warn("player {} did not send keepalive packet", player.getUsername());
                 player.kick(Component.text("Simple Voice Chat | Connection timed out.")); // todo: remove me, i'm a library
@@ -242,6 +246,7 @@ public final class VoiceServer {
         if (!this.permissions.hasPermission(player, Permission.SPEAK)) return;
 
         PlayerMicrophoneEvent event = new PlayerMicrophoneEvent(player, packet.data());
+        event.setSoundSelector(SoundSelector.distance(this.distance)); // listeners may override this
         EventDispatcher.callCancellable(event, () -> {
             Group group = player.getTag(Tags.GROUP);
             if (group == null) {

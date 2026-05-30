@@ -2,6 +2,7 @@ package dev.lu15.voicechat.network.minecraft;
 
 import dev.lu15.voicechat.VoiceChat;
 import dev.lu15.voicechat.network.minecraft.packets.clientbound.CategoryAddedPacket;
+import dev.lu15.voicechat.network.minecraft.packets.clientbound.CategoryRemovedPacket;
 import dev.lu15.voicechat.network.minecraft.packets.clientbound.VoiceStateRemovedPacket;
 import dev.lu15.voicechat.network.minecraft.packets.serverbound.CreateGroupPacket;
 import dev.lu15.voicechat.network.minecraft.packets.clientbound.GroupCreatedPacket;
@@ -36,7 +37,7 @@ public final class MinecraftPacketHandler {
         this.register(GroupChangedPacket.IDENTIFIER, GroupChangedPacket.SERIALIZER);
         this.register(GroupRemovedPacket.IDENTIFIER, GroupRemovedPacket.SERIALIZER);
         this.register(CategoryAddedPacket.IDENTIFIER, CategoryAddedPacket.SERIALIZER);
-        this.register(CategoryAddedPacket.IDENTIFIER, CategoryAddedPacket.SERIALIZER);
+        this.register(CategoryRemovedPacket.IDENTIFIER, CategoryRemovedPacket.SERIALIZER);
 
         // serverbound
         this.register(HandshakePacket.IDENTIFIER, HandshakePacket.SERIALIZER);

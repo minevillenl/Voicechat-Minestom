@@ -66,12 +66,24 @@ final class VoiceChatImpl implements VoiceChat {
     private final int port;
     private final @NotNull String publicAddress;
     private final @NotNull PermissionHandler permissions;
+    private final @NotNull Codec codec;
+    private final int mtuSize;
+    private final double distance;
+    private final int keepAlive;
+    private final boolean groupsEnabled;
+    private final boolean allowRecording;
 
     @SuppressWarnings("PatternValidation")
-    private VoiceChatImpl(@NotNull InetAddress address, int port, @NotNull EventNode<Event> eventNode, @NotNull String publicAddress, @NotNull PermissionHandler permissions) {
-        this.port = port;
-        this.publicAddress = publicAddress;
-        this.permissions = permissions;
+    private VoiceChatImpl(@NotNull BuilderImpl builder, @NotNull InetAddress address, @NotNull EventNode<Event> eventNode) {
+        this.port = builder.port;
+        this.publicAddress = builder.publicAddress;
+        this.permissions = builder.permissions;
+        this.codec = builder.codec;
+        this.mtuSize = builder.mtuSize;
+        this.distance = builder.distance;
+        this.keepAlive = builder.keepAlive;
+        this.groupsEnabled = builder.groupsEnabled;
+        this.allowRecording = builder.allowRecording;
 
         // minestom doesn't allow removal of items from registries by default, so
         // we have to enable this feature to allow for the removal of categories
@@ -79,7 +91,7 @@ final class VoiceChatImpl implements VoiceChat {
 
         EventNode<Event> voiceServerEventNode = EventNode.all("voice-server");
         eventNode.addChild(voiceServerEventNode);
-        this.server = new VoiceServer(this, address, port, voiceServerEventNode, permissions);
+        this.server = new VoiceServer(this, address, this.port, voiceServerEventNode, this.permissions, this.distance, this.keepAlive);
 
         this.server.start();
         LOGGER.info("voice server started on {}:{}", address, port);
@@ -154,13 +166,13 @@ final class VoiceChatImpl implements VoiceChat {
                     event.getSecret(),
                     this.port,
                     player.getUuid(), // why is this sent? the client already knows the player's uuid
-                    Codec.VOIP, // todo: configurable
-                    1024, // todo: configurable
-                    48, // todo: configurable
-                    1000, // todo: configurable
-                    true, // groups enabled
+                    this.codec,
+                    this.mtuSize,
+                    this.distance,
+                    this.keepAlive,
+                    this.groupsEnabled,
                     this.publicAddress,
-                    false // todo: configurable
+                    this.allowRecording
             )));
         });
     }
@@ -325,8 +337,14 @@ final class VoiceChatImpl implements VoiceChat {
         private final @NotNull InetAddress address;
         private final int port;
 
-        private @NotNull String publicAddress = ""; // this causes the client to attempt to connect to the same ip as the minecraft server
+        private @NotNull String publicAddress = "";
         private @NotNull PermissionHandler permissions = PermissionHandler.ALLOW_ALL;
+        private @NotNull Codec codec = Codec.VOIP;
+        private int mtuSize = 1024;
+        private double distance = 48;
+        private int keepAlive = 1000;
+        private boolean groupsEnabled = true;
+        private boolean allowRecording = false;
 
         private @Nullable EventNode<Event> eventNode;
 
@@ -358,6 +376,42 @@ final class VoiceChatImpl implements VoiceChat {
         }
 
         @Override
+        public @NotNull Builder codec(@NotNull Codec codec) {
+            this.codec = codec;
+            return this;
+        }
+
+        @Override
+        public @NotNull Builder mtuSize(int mtuSize) {
+            this.mtuSize = mtuSize;
+            return this;
+        }
+
+        @Override
+        public @NotNull Builder distance(double distance) {
+            this.distance = distance;
+            return this;
+        }
+
+        @Override
+        public @NotNull Builder keepAlive(int keepAlive) {
+            this.keepAlive = keepAlive;
+            return this;
+        }
+
+        @Override
+        public @NotNull Builder groupsEnabled(boolean groupsEnabled) {
+            this.groupsEnabled = groupsEnabled;
+            return this;
+        }
+
+        @Override
+        public @NotNull Builder allowRecording(boolean allowRecording) {
+            this.allowRecording = allowRecording;
+            return this;
+        }
+
+        @Override
         public @NotNull VoiceChat enable() {
             // if the user did not provide an event node, create and register one
             if (this.eventNode == null) {
@@ -365,7 +419,7 @@ final class VoiceChatImpl implements VoiceChat {
                 MinecraftServer.getGlobalEventHandler().addChild(this.eventNode);
             }
 
-            return new VoiceChatImpl(this.address, this.port, this.eventNode, this.publicAddress, this.permissions);
+            return new VoiceChatImpl(this, this.address, this.eventNode);
         }
 
     }

@@ -1,4 +1,4 @@
-package dev.lu15.voicechat;
+package dev.lu15.voicechat.permission;
 
 /**
  * The default audience of a {@link Permission}, mirroring Simple Voice Chat's

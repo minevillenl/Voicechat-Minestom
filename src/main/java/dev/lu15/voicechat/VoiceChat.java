@@ -4,6 +4,8 @@ import dev.lu15.voicechat.network.minecraft.Category;
 import dev.lu15.voicechat.network.minecraft.Packet;
 import dev.lu15.voicechat.network.voice.VoicePacket;
 import java.util.Collection;
+
+import dev.lu15.voicechat.permission.PermissionHandler;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.KeyPattern;
 import net.minestom.server.entity.Player;

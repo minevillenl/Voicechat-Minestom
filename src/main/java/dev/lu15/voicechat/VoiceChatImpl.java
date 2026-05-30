@@ -1,6 +1,10 @@
 package dev.lu15.voicechat;
 
+import dev.lu15.voicechat.event.GroupRemovedVoiceChatEvent;
+import dev.lu15.voicechat.event.PlayerCreateGroupVoiceChatEvent;
+import dev.lu15.voicechat.event.PlayerJoinGroupVoiceChatEvent;
 import dev.lu15.voicechat.event.PlayerJoinVoiceChatEvent;
+import dev.lu15.voicechat.event.PlayerLeaveGroupVoiceChatEvent;
 import dev.lu15.voicechat.network.minecraft.Category;
 import dev.lu15.voicechat.network.minecraft.Group;
 import dev.lu15.voicechat.network.minecraft.VoiceState;
@@ -34,6 +38,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+
+import dev.lu15.voicechat.permission.Permission;
+import dev.lu15.voicechat.permission.PermissionHandler;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.minestom.server.MinecraftServer;
@@ -215,15 +222,19 @@ final class VoiceChatImpl implements VoiceChat {
                 false, // hidden
                 packet.type()
         );
-        this.groups.put(group.id(), group);
-        if (packet.password() != null) this.groupPasswords.put(group.id(), packet.password());
 
-        this.broadcastToClients(new GroupCreatedPacket(group));
+        PlayerCreateGroupVoiceChatEvent event = new PlayerCreateGroupVoiceChatEvent(player, group);
+        EventDispatcher.callCancellable(event, () -> {
+            this.groups.put(group.id(), group);
+            if (packet.password() != null) this.groupPasswords.put(group.id(), packet.password());
 
-        // the creator immediately joins their new group
-        this.broadcastState(player, this.isDisabled(player), group);
-        this.sendPacket(player, new GroupChangedPacket(group.id(), false));
-        this.cleanupGroups(); // reap the group the creator just left, if now empty
+            this.broadcastToClients(new GroupCreatedPacket(group));
+
+            // the creator immediately joins their new group
+            this.broadcastState(player, this.isDisabled(player), group);
+            this.sendPacket(player, new GroupChangedPacket(group.id(), false));
+            this.cleanupGroups(); // reap the group the creator just left, if now empty
+        });
     }
 
     private void handle(@NotNull Player player, @NotNull JoinGroupPacket packet) {
@@ -245,15 +256,20 @@ final class VoiceChatImpl implements VoiceChat {
             return;
         }
 
-        this.broadcastState(player, this.isDisabled(player), group);
-        this.sendPacket(player, new GroupChangedPacket(group.id(), false));
-        this.cleanupGroups(); // reap the group the player just left, if now empty
+        PlayerJoinGroupVoiceChatEvent event = new PlayerJoinGroupVoiceChatEvent(player, group);
+        EventDispatcher.callCancellable(event, () -> {
+            this.broadcastState(player, this.isDisabled(player), group);
+            this.sendPacket(player, new GroupChangedPacket(group.id(), false));
+            this.cleanupGroups(); // reap the group the player just left, if now empty
+        });
     }
 
     private void handle(@NotNull Player player, @NotNull LeaveGroupPacket packet) {
+        Group previous = player.getTag(Tags.GROUP);
         this.broadcastState(player, this.isDisabled(player), null);
         this.sendPacket(player, new GroupChangedPacket(null, false));
         this.cleanupGroups();
+        EventDispatcher.call(new PlayerLeaveGroupVoiceChatEvent(player, previous));
     }
 
     private boolean isDisabled(@NotNull Player player) {
@@ -308,6 +324,7 @@ final class VoiceChatImpl implements VoiceChat {
             this.groups.remove(id);
             this.groupPasswords.remove(id);
             this.broadcastToClients(new GroupRemovedPacket(id));
+            EventDispatcher.call(new GroupRemovedVoiceChatEvent(group));
         }
     }
 

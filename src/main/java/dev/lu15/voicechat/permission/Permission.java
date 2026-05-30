@@ -1,4 +1,4 @@
-package dev.lu15.voicechat;
+package dev.lu15.voicechat.permission;
 
 import org.jetbrains.annotations.NotNull;
 

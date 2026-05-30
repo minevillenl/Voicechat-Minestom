@@ -1,7 +1,7 @@
 package dev.lu15.voicechat.network.voice;
 
-import dev.lu15.voicechat.Permission;
-import dev.lu15.voicechat.PermissionHandler;
+import dev.lu15.voicechat.permission.Permission;
+import dev.lu15.voicechat.permission.PermissionHandler;
 import dev.lu15.voicechat.SoundSources;
 import dev.lu15.voicechat.api.SoundSelector;
 import dev.lu15.voicechat.Tags;
@@ -9,6 +9,7 @@ import dev.lu15.voicechat.VoiceChat;
 import dev.lu15.voicechat.network.minecraft.Group;
 import dev.lu15.voicechat.network.minecraft.VoiceState;
 import dev.lu15.voicechat.event.PlayerJoinVoiceChatEvent;
+import dev.lu15.voicechat.event.PlayerLeaveVoiceChatEvent;
 import dev.lu15.voicechat.event.PlayerMicrophoneEvent;
 import dev.lu15.voicechat.network.minecraft.packets.clientbound.VoiceStatesUpdatedPacket;
 import dev.lu15.voicechat.network.voice.encryption.SecretUtilities;
@@ -75,6 +76,7 @@ public final class VoiceServer {
             Player player = event.getPlayer();
             if (!player.hasTag(Tags.VOICE_CLIENT)) return;
             this.connections.remove(player.getTag(Tags.VOICE_CLIENT));
+            EventDispatcher.call(new PlayerLeaveVoiceChatEvent(player));
         });
     }
 
@@ -201,6 +203,7 @@ public final class VoiceServer {
                 LOGGER.warn("player {} did not send keepalive packet", player.getUsername());
                 player.kick(Component.text("Simple Voice Chat | Connection timed out.")); // todo: remove me, i'm a library
                 this.connections.remove(address);
+                EventDispatcher.call(new PlayerLeaveVoiceChatEvent(player));
             } else this.write(player, new KeepAlivePacket());
         });
     }

@@ -1,4 +1,4 @@
-package dev.lu15.voicechat;
+package dev.lu15.voicechat.permission;
 
 import net.minestom.server.entity.Player;
 import org.jetbrains.annotations.NotNull;
